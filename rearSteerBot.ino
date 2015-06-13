@@ -60,7 +60,7 @@ int getSteer() {
 		cmLeft = MAXRANGE;
 	if (cmRight > MAXRANGE)
 		cmRight = MAXRANGE;
-	return STRAIGHT + (cmLeft - cmRight) * (STRAIGHT - RIGHT) / MAXRANGE;
+	return STRAIGHT + ((cmLeft > cmRight) ? (MAXRANGE - cmRight) : - (MAXRANGE - cmLeft)) * (STRAIGHT - RIGHT) / MAXRANGE;
 }
 
 
