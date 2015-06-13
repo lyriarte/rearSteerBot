@@ -24,8 +24,12 @@
 Servo steerServo;
 int cmLeft;
 int cmRight;
+int steerAdjust;
+int speedDelay;
 
 void setup() {
+	steerAdjust = 0;
+	speedDelay = 0; 
 	pinMode(STEERSERVO, OUTPUT);
 	pinMode(INLEFT, INPUT);
 	pinMode(INRIGHT, INPUT);
@@ -44,12 +48,6 @@ void setup() {
 }
 
 int getSteer() {
-	if (digitalRead(INLEFT) == HIGH)
-		return LEFT;
-  	if (digitalRead(INRIGHT) == HIGH)
-		return RIGHT;
-	if (digitalRead(INSTOP) == HIGH)
-		return STOP;
 	if (cmLeft < STOPRANGE || cmRight < STOPRANGE)
 		return STOP;
 	if (cmLeft < MINRANGE && cmRight < MINRANGE)
@@ -81,15 +79,25 @@ void loop() {
 	Serial.print(cmLeft);
 	Serial.print(" : ");
 	Serial.println(cmRight);
+	if (digitalRead(INLEFT) == HIGH)
+		steerAdjust += 5;
+  	if (digitalRead(INRIGHT) == HIGH)
+		steerAdjust -= 5;
+	if (digitalRead(INSTOP) == HIGH)
+		speedDelay += 10;
+	if (speedDelay != 0) {
+		digitalWrite(ENGINERELAY, LOW);
+		delay(speedDelay);
+	}
 	steer = getSteer();
 	Serial.println(steer);
 	if (steer == STOP) {
 		digitalWrite(ENGINERELAY, LOW);
-		steerServo.write(STRAIGHT);
+		steerServo.write(STRAIGHT+steerAdjust);
 	}
   	else {
 		digitalWrite(ENGINERELAY, HIGH);
-		steerServo.write(steer);
+		steerServo.write(steer+steerAdjust);
 	}
 	delay(POLL);
 }
