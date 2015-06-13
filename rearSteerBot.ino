@@ -4,7 +4,7 @@
 #define ENGINERELAY 13
 #define INLEFT 10
 #define INRIGHT 11
-#define INRUN 12
+#define INSTOP 12
 #define INLEFTECHO 2
 #define LEFTTRIGGER 3
 #define INRIGHTECHO 4
@@ -14,17 +14,23 @@
 
 #define STOP 0
 #define STRAIGHT 90
-#define LEFT 120
-#define RIGHT 60
+#define LEFT 135
+#define RIGHT 45
+
+#define MAXRANGE 100
+#define MINRANGE  25
+#define STOPRANGE 05
 
 Servo steerServo;
+int cmLeft;
+int cmRight;
 
 void setup() {
 	pinMode(STEERSERVO, OUTPUT);
 	pinMode(INLEFT, INPUT);
 	pinMode(INRIGHT, INPUT);
 	pinMode(ENGINERELAY, OUTPUT);
-	pinMode(INRUN, INPUT);
+	pinMode(INSTOP, INPUT);
 	pinMode(INLEFTECHO, INPUT);
 	pinMode(LEFTTRIGGER, OUTPUT);
 	pinMode(INRIGHTECHO, INPUT);
@@ -42,29 +48,48 @@ int getSteer() {
 		return LEFT;
   	if (digitalRead(INRIGHT) == HIGH)
 		return RIGHT;
-	return STRAIGHT;
+	if (digitalRead(INSTOP) == HIGH)
+		return STOP;
+	if (cmLeft < STOPRANGE || cmRight < STOPRANGE)
+		return STOP;
+	if (cmLeft < MINRANGE && cmRight < MINRANGE)
+		return STOP;
+	if (cmLeft < MINRANGE)
+		return RIGHT;
+	if (cmRight < MINRANGE)
+		return LEFT;
+	if (cmLeft > MAXRANGE)
+		cmLeft = MAXRANGE;
+	if (cmRight > MAXRANGE)
+		cmRight = MAXRANGE;
+	return STRAIGHT + (cmLeft - cmRight) * (STRAIGHT - RIGHT) / MAXRANGE;
 }
 
 
 void loop() {
+	int steer;
 	unsigned long echoDuration;
 	digitalWrite(LEFTTRIGGER, HIGH);
 	digitalWrite(LEFTTRIGGER, LOW);
-	Serial.print("Reading... ");
 	echoDuration = pulseIn(INLEFTECHO, HIGH, 100000);
-	Serial.print(echoDuration / 60);
+	cmLeft = echoDuration / 60;
 	digitalWrite(RIGHTTRIGGER, HIGH);
 	delayMicroseconds(10);
 	digitalWrite(RIGHTTRIGGER, LOW);
-	Serial.print("... ");
 	echoDuration = pulseIn(INRIGHTECHO, HIGH, 100000);
-	Serial.println(echoDuration / 60);
-	steerServo.write(getSteer());
-	if (digitalRead(INRUN) == HIGH) {
-		digitalWrite(ENGINERELAY, HIGH);
+	cmRight = echoDuration / 60;
+	Serial.print(cmLeft);
+	Serial.print(" : ");
+	Serial.println(cmRight);
+	steer = getSteer();
+	Serial.println(steer);
+	if (steer == STOP) {
+		digitalWrite(ENGINERELAY, LOW);
+		steerServo.write(STRAIGHT);
 	}
   	else {
-		digitalWrite(ENGINERELAY, LOW);
+		digitalWrite(ENGINERELAY, HIGH);
+		steerServo.write(steer);
 	}
 	delay(POLL);
 }
