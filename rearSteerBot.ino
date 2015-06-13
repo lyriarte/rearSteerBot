@@ -26,17 +26,18 @@ void setup() {
 	digitalWrite(ENGINERELAY, LOW);
 }
 
+int getSteer() {
+	if (digitalRead(INLEFT) == HIGH)
+		return LEFT;
+  	if (digitalRead(INRIGHT) == HIGH)
+		return RIGHT;
+	return STRAIGHT;
+}
+
+
 void loop() {
-  	if (digitalRead(INLEFT) == HIGH) {
-		steerServo.write(LEFT);
-	}
-  	else if (digitalRead(INRIGHT) == HIGH) {
-		steerServo.write(RIGHT);
-	}
-  	else {
-		steerServo.write(STRAIGHT);
-	}
-  	if (digitalRead(INRUN) == HIGH) {
+	steerServo.write(getSteer());
+	if (digitalRead(INRUN) == HIGH) {
 		digitalWrite(ENGINERELAY, HIGH);
 	}
   	else {
@@ -44,3 +45,4 @@ void loop() {
 	}
 	delay(pollms);
 }
+
