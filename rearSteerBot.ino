@@ -17,9 +17,9 @@
 #define LEFT 135
 #define RIGHT 45
 
-#define MAXRANGE 100
-#define MINRANGE  25
-#define STOPRANGE 05
+#define MAXRANGE 150
+#define MINRANGE  30
+#define STOPRANGE 15
 
 Servo steerServo;
 int cmLeft;
@@ -70,12 +70,12 @@ void loop() {
 	digitalWrite(LEFTTRIGGER, HIGH);
 	digitalWrite(LEFTTRIGGER, LOW);
 	echoDuration = pulseIn(INLEFTECHO, HIGH, 100000);
-	cmLeft = echoDuration / 60;
+	cmLeft = echoDuration ? echoDuration / 60 : MAXRANGE;
 	digitalWrite(RIGHTTRIGGER, HIGH);
 	delayMicroseconds(10);
 	digitalWrite(RIGHTTRIGGER, LOW);
 	echoDuration = pulseIn(INRIGHTECHO, HIGH, 100000);
-	cmRight = echoDuration / 60;
+	cmRight = echoDuration ? echoDuration / 60 : MAXRANGE;
 	Serial.print(cmLeft);
 	Serial.print(" : ");
 	Serial.println(cmRight);
