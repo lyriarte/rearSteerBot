@@ -17,19 +17,28 @@
 #define LEFT 135
 #define RIGHT 45
 
-#define MAXRANGE 150
-#define MINRANGE  30
-#define STOPRANGE 15
+#define MAXRANGE 200
+#define MINRANGE  50
+#define STOPRANGE 20
+#define MAXRANGE_0 30
+#define MINRANGE_0 10
+#define STOPRANGE_0 5
 
 Servo steerServo;
 int cmLeft;
 int cmRight;
 int steerAdjust;
 int speedDelay;
+int maxRange;
+int minRange;
+int stopRange;
 
 void setup() {
 	steerAdjust = 0;
 	speedDelay = 0; 
+	maxRange = MAXRANGE;
+	minRange = MINRANGE;
+	stopRange = STOPRANGE;
 	pinMode(STEERSERVO, OUTPUT);
 	pinMode(INLEFT, INPUT);
 	pinMode(INRIGHT, INPUT);
@@ -48,19 +57,19 @@ void setup() {
 }
 
 int getSteer() {
-	if (cmLeft < STOPRANGE || cmRight < STOPRANGE)
+	if (cmLeft < stopRange || cmRight < stopRange)
 		return STOP;
-	if (cmLeft < MINRANGE && cmRight < MINRANGE)
+	if (cmLeft < minRange && cmRight < minRange)
 		return STOP;
-	if (cmLeft < MINRANGE)
+	if (cmLeft < minRange)
 		return RIGHT;
-	if (cmRight < MINRANGE)
+	if (cmRight < minRange)
 		return LEFT;
-	if (cmLeft > MAXRANGE)
-		cmLeft = MAXRANGE;
-	if (cmRight > MAXRANGE)
-		cmRight = MAXRANGE;
-	return STRAIGHT + ((cmLeft > cmRight) ? (MAXRANGE - cmRight) : - (MAXRANGE - cmLeft)) * (STRAIGHT - RIGHT) / MAXRANGE;
+	if (cmLeft > maxRange)
+		cmLeft = maxRange;
+	if (cmRight > maxRange)
+		cmRight = maxRange;
+	return STRAIGHT + ((cmLeft > cmRight) ? (maxRange - cmRight) : - (maxRange - cmLeft)) * (STRAIGHT - RIGHT) / maxRange;
 }
 
 
@@ -71,12 +80,12 @@ void loop() {
 	delayMicroseconds(10);
 	digitalWrite(LEFTTRIGGER, LOW);
 	echoDuration = pulseIn(INLEFTECHO, HIGH, 100000);
-	cmLeft = echoDuration ? echoDuration / 60 : MAXRANGE;
+	cmLeft = echoDuration ? echoDuration / 60 : maxRange;
 	digitalWrite(RIGHTTRIGGER, HIGH);
 	delayMicroseconds(10);
 	digitalWrite(RIGHTTRIGGER, LOW);
 	echoDuration = pulseIn(INRIGHTECHO, HIGH, 100000);
-	cmRight = echoDuration ? echoDuration / 60 : MAXRANGE;
+	cmRight = echoDuration ? echoDuration / 60 : maxRange;
 	Serial.print(cmLeft);
 	Serial.print(" : ");
 	Serial.println(cmRight);
@@ -84,8 +93,12 @@ void loop() {
 		steerAdjust += 5;
   	if (digitalRead(INRIGHT) == HIGH)
 		steerAdjust -= 5;
-	if (digitalRead(INSTOP) == HIGH)
+	if (digitalRead(INSTOP) == HIGH) {
 		speedDelay += 10;
+		maxRange = max(MAXRANGE_0, MAXRANGE * 0.667);
+		minRange = max(MINRANGE_0, MINRANGE * 0.667);
+		stopRange = max(STOPRANGE_0, STOPRANGE * 0.667);
+	}
 	if (speedDelay != 0) {
 		digitalWrite(ENGINERELAY, LOW);
 		delay(speedDelay);
