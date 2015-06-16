@@ -68,6 +68,7 @@ void loop() {
 	int steer;
 	unsigned long echoDuration;
 	digitalWrite(LEFTTRIGGER, HIGH);
+	delayMicroseconds(10);
 	digitalWrite(LEFTTRIGGER, LOW);
 	echoDuration = pulseIn(INLEFTECHO, HIGH, 100000);
 	cmLeft = echoDuration ? echoDuration / 60 : MAXRANGE;
