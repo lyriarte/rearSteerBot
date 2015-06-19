@@ -64,7 +64,7 @@ int getSteer() {
 	if (cmLeft < stopRange || cmRight < stopRange)
 		return STOP;
 	if (cmLeft < minRange && cmRight < minRange)
-		return STOP;
+		return (cmLeft > cmRight) ? LEFT : RIGHT;
 	if (cmLeft < minRange)
 		return RIGHT;
 	if (cmRight < minRange)
