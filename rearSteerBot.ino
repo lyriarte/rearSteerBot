@@ -14,15 +14,19 @@
 
 #define STOP 0
 #define STRAIGHT 90
-#define LEFT 135
-#define RIGHT 45
+#define LEFT 140
+#define RIGHT 40
 
 #define MAXRANGE 200
 #define MINRANGE  50
 #define STOPRANGE 20
-#define MAXRANGE_0 30
-#define MINRANGE_0 10
+#define MAXRANGE_0 120
+#define MINRANGE_0 20
 #define STOPRANGE_0 5
+
+#define DELTA_STEER 5
+#define DELTA_DELAY 10
+#define RANGE_FACTOR 0.667
 
 Servo steerServo;
 int cmLeft;
@@ -90,14 +94,14 @@ void loop() {
 	Serial.print(" : ");
 	Serial.println(cmRight);
 	if (digitalRead(INLEFT) == HIGH)
-		steerAdjust += 5;
+		steerAdjust += DELTA_STEER;
   	if (digitalRead(INRIGHT) == HIGH)
-		steerAdjust -= 5;
+		steerAdjust -= DELTA_STEER;
 	if (digitalRead(INSTOP) == HIGH) {
-		speedDelay += 10;
-		maxRange = max(MAXRANGE_0, MAXRANGE * 0.667);
-		minRange = max(MINRANGE_0, MINRANGE * 0.667);
-		stopRange = max(STOPRANGE_0, STOPRANGE * 0.667);
+		speedDelay += DELTA_DELAY;
+		maxRange = max(MAXRANGE_0, MAXRANGE * RANGE_FACTOR);
+		minRange = max(MINRANGE_0, MINRANGE * RANGE_FACTOR);
+		stopRange = max(STOPRANGE_0, STOPRANGE * RANGE_FACTOR);
 	}
 	if (speedDelay != 0) {
 		digitalWrite(ENGINERELAY, LOW);
