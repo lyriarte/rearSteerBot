@@ -1,5 +1,18 @@
+/*
+ * Copyright (c) 2015, Luc Yriarte
+ * License: BSD <http://www.opensource.org/licenses/bsd-license.php>
+ */
+
 #include <Servo.h> 
 
+
+/* **** **** **** **** **** ****
+ * Constants
+ * **** **** **** **** **** ****/
+
+/* 
+ * gpio mappings
+ */
 #define STEERSERVO 7
 #define ENGINERELAY 13
 #define INLEFT 10
@@ -10,13 +23,22 @@
 #define INRIGHTECHO 4
 #define RIGHTTRIGGER 5
 
+/* 
+ * control loop frequency
+ */
 #define POLL 50
 
+/* 
+ * action
+ */
 #define STOP 0
 #define STRAIGHT 90
 #define LEFT 140
 #define RIGHT 40
 
+/* 
+ * perception
+ */
 #define MAXRANGE 200
 #define MINRANGE  50
 #define STOPRANGE 20
@@ -24,25 +46,55 @@
 #define MINRANGE_0 20
 #define STOPRANGE_0 5
 
+/* 
+ * internal state
+ */
 #define DELTA_STEER 5
 #define DELTA_DELAY 10
 #define RANGE_FACTOR 0.667
 
+
+/* **** **** **** **** **** ****
+ * Global variables
+ * **** **** **** **** **** ****/
+
+/* 
+ * action
+ */
 Servo steerServo;
+
+/* 
+ * perception
+ */
 int cmLeft;
 int cmRight;
+
+/* 
+ * internal state
+ */
 int steerAdjust;
 int speedDelay;
 int maxRange;
 int minRange;
 int stopRange;
 
+
+
+/* **** **** **** **** **** ****
+ * Functions
+ * **** **** **** **** **** ****/
+
+/* 
+ * setup
+ */
 void setup() {
+	/* globals initialization */
 	steerAdjust = 0;
 	speedDelay = 0; 
 	maxRange = MAXRANGE;
 	minRange = MINRANGE;
 	stopRange = STOPRANGE;
+	/* gpio mappings */
 	pinMode(STEERSERVO, OUTPUT);
 	pinMode(INLEFT, INPUT);
 	pinMode(INRIGHT, INPUT);
@@ -52,14 +104,20 @@ void setup() {
 	pinMode(LEFTTRIGGER, OUTPUT);
 	pinMode(INRIGHTECHO, INPUT);
 	pinMode(RIGHTTRIGGER, OUTPUT);
+	/* subsystems setup */
 	steerServo.attach(STEERSERVO);
 	Serial.begin(9600);
+	/* initial action state */
 	steerServo.write(STRAIGHT);
 	digitalWrite(ENGINERELAY, LOW);
 	digitalWrite(LEFTTRIGGER, LOW);
 	digitalWrite(RIGHTTRIGGER, LOW);
 }
 
+/* 
+ * reactive avoidance decision function
+ *	perception x inner state -> action
+ */
 int getSteer() {
 	if (cmLeft < stopRange || cmRight < stopRange)
 		return STOP;
@@ -77,8 +135,12 @@ int getSteer() {
 }
 
 
+/* 
+ * control loop
+ */
 void loop() {
 	int steer;
+	/* perception */
 	unsigned long echoDuration;
 	digitalWrite(LEFTTRIGGER, HIGH);
 	delayMicroseconds(10);
@@ -90,9 +152,11 @@ void loop() {
 	digitalWrite(RIGHTTRIGGER, LOW);
 	echoDuration = pulseIn(INRIGHTECHO, HIGH, 100000);
 	cmRight = echoDuration ? echoDuration / 60 : maxRange;
+	/* perception log */
 	Serial.print(cmLeft);
 	Serial.print(" : ");
 	Serial.println(cmRight);
+	/* inner state calibration */
 	if (digitalRead(INLEFT) == HIGH)
 		steerAdjust += DELTA_STEER;
   	if (digitalRead(INRIGHT) == HIGH)
@@ -103,12 +167,16 @@ void loop() {
 		minRange = max(MINRANGE_0, MINRANGE * RANGE_FACTOR);
 		stopRange = max(STOPRANGE_0, STOPRANGE * RANGE_FACTOR);
 	}
+	/* inner state */
 	if (speedDelay != 0) {
 		digitalWrite(ENGINERELAY, LOW);
 		delay(speedDelay);
 	}
+	/* decision */
 	steer = getSteer();
+	/* decision log */
 	Serial.println(steer);
+	/* action */
 	if (steer == STOP) {
 		digitalWrite(ENGINERELAY, LOW);
 		steerServo.write(STRAIGHT+steerAdjust);
@@ -117,6 +185,7 @@ void loop() {
 		digitalWrite(ENGINERELAY, HIGH);
 		steerServo.write(steer+steerAdjust);
 	}
+	/* control loop frequency */
 	delay(POLL);
 }
 
