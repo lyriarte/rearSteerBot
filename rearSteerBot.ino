@@ -50,7 +50,7 @@
  * internal state
  */
 #define DELTA_STEER 5
-#define DELTA_DELAY 10
+#define DELTA_DELAY 2
 #define RANGE_FACTOR 0.667
 
 
