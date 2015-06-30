@@ -152,10 +152,6 @@ void loop() {
 	digitalWrite(RIGHTTRIGGER, LOW);
 	echoDuration = pulseIn(INRIGHTECHO, HIGH, 100000);
 	cmRight = echoDuration ? echoDuration / 60 : maxRange;
-	/* perception log */
-	Serial.print(cmLeft);
-	Serial.print(" : ");
-	Serial.println(cmRight);
 	/* inner state calibration */
 	if (digitalRead(INLEFT) == HIGH)
 		steerAdjust += DELTA_STEER;
@@ -174,8 +170,8 @@ void loop() {
 	}
 	/* decision */
 	steer = getSteer();
-	/* decision log */
-	Serial.println(steer);
+	/* communication */
+	Serial.println(String(cmLeft) + " | " + String(cmRight) + " -> " + String(steer));
 	/* action */
 	if (steer == STOP) {
 		digitalWrite(ENGINERELAY, LOW);
