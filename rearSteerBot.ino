@@ -42,16 +42,12 @@
 #define MAXRANGE 200
 #define MINRANGE  50
 #define STOPRANGE 20
-#define MAXRANGE_0 120
-#define MINRANGE_0 20
-#define STOPRANGE_0 5
 
 /* 
  * internal state
  */
 #define DELTA_STEER 5
 #define DELTA_DELAY 2
-#define RANGE_FACTOR 0.667
 
 
 /* **** **** **** **** **** ****
@@ -62,6 +58,8 @@
  * action
  */
 Servo steerServo;
+int steer;
+int speed;
 
 /* 
  * perception
@@ -74,9 +72,6 @@ int cmRight;
  */
 int steerAdjust;
 int speedDelay;
-int maxRange;
-int minRange;
-int stopRange;
 
 
 
@@ -91,9 +86,8 @@ void setup() {
 	/* globals initialization */
 	steerAdjust = 0;
 	speedDelay = 0; 
-	maxRange = MAXRANGE;
-	minRange = MINRANGE;
-	stopRange = STOPRANGE;
+	steer = STRAIGHT;
+	speed = 0;
 	/* gpio mappings */
 	pinMode(STEERSERVO, OUTPUT);
 	pinMode(INLEFT, INPUT);
@@ -108,7 +102,7 @@ void setup() {
 	steerServo.attach(STEERSERVO);
 	Serial.begin(9600);
 	/* initial action state */
-	steerServo.write(STRAIGHT);
+	steerServo.write(steer);
 	digitalWrite(ENGINERELAY, LOW);
 	digitalWrite(LEFTTRIGGER, LOW);
 	digitalWrite(RIGHTTRIGGER, LOW);
@@ -116,24 +110,36 @@ void setup() {
 
 /* 
  * reactive avoidance decision function
- *	perception x inner state -> action
  */
-int getSteer() {
-	if (cmLeft < stopRange || cmRight < stopRange)
-		return STOP;
-	if (cmLeft < minRange && cmRight < minRange)
-		return (cmLeft > cmRight) ? LEFT : RIGHT;
-	if (cmLeft < minRange)
-		return RIGHT;
-	if (cmRight < minRange)
-		return LEFT;
-	if (cmLeft > maxRange)
-		cmLeft = maxRange;
-	if (cmRight > maxRange)
-		cmRight = maxRange;
-	return STRAIGHT + ((cmLeft > cmRight) ? (maxRange - cmRight) : - (maxRange - cmLeft)) * (STRAIGHT - RIGHT) / maxRange;
+boolean avoidance() {
+	if (cmLeft < STOPRANGE || cmRight < STOPRANGE) {
+		steer = STRAIGHT;
+		speed = 0;
+		return true;
+	}
+	if (cmLeft < MINRANGE && cmRight < MINRANGE) {
+		steer = (cmLeft > cmRight) ? LEFT : RIGHT;
+		return true;
+	}
+	if (cmLeft < MINRANGE) {
+		steer = RIGHT;
+		return true;
+	}
+	if (cmRight < MINRANGE) {
+		steer = LEFT;
+		return true;
+	}
+	return false;
 }
 
+/* 
+ * trajectory decision function
+ */
+boolean trajectory() {
+	steer = STRAIGHT;
+	speed = 1;
+	return true;
+}
 
 /* 
  * control loop
@@ -149,42 +155,32 @@ void loop() {
 	delayMicroseconds(10);
 	digitalWrite(LEFTTRIGGER, LOW);
 	echoDuration = pulseIn(INLEFTECHO, HIGH, 100000);
-	cmLeft = echoDuration ? echoDuration / 60 : maxRange;
+	cmLeft = echoDuration ? echoDuration / 60 : MAXRANGE;
 	digitalWrite(RIGHTTRIGGER, HIGH);
 	delayMicroseconds(10);
 	digitalWrite(RIGHTTRIGGER, LOW);
 	echoDuration = pulseIn(INRIGHTECHO, HIGH, 100000);
-	cmRight = echoDuration ? echoDuration / 60 : maxRange;
+	cmRight = echoDuration ? echoDuration / 60 : MAXRANGE;
 	/* inner state calibration */
 	if (digitalRead(INLEFT) == HIGH)
 		steerAdjust += DELTA_STEER;
   	if (digitalRead(INRIGHT) == HIGH)
 		steerAdjust -= DELTA_STEER;
-	if (digitalRead(INSTOP) == HIGH) {
+	if (digitalRead(INSTOP) == HIGH)
 		speedDelay += DELTA_DELAY;
-		maxRange = max(MAXRANGE_0, MAXRANGE * RANGE_FACTOR);
-		minRange = max(MINRANGE_0, MINRANGE * RANGE_FACTOR);
-		stopRange = max(STOPRANGE_0, STOPRANGE * RANGE_FACTOR);
-	}
 	/* inner state */
 	if (speedDelay != 0) {
 		digitalWrite(ENGINERELAY, LOW);
 		delay(speedDelay);
 	}
 	/* decision */
-	int steer;
-	steer = getSteer();
+	if (!avoidance())
+		trajectory();
 	/* communication */
-	Serial.println("[" + String(millis()) + "] " + String(cmLeft) + " | " + String(cmRight) + " -> " + String(steer));
+	Serial.println("[" + String(millis()) + "] " + String(cmLeft) + " | " + String(cmRight) + " -> " + String(steer) + " , " + String(speed));
 	/* action */
-	if (steer == STOP) {
-		digitalWrite(ENGINERELAY, LOW);
-		steerServo.write(STRAIGHT+steerAdjust);
-	}
-  	else {
-		digitalWrite(ENGINERELAY, HIGH);
-		steerServo.write(steer+steerAdjust);
-	}
+	digitalWrite(ENGINERELAY, speed ? HIGH : LOW);
+	steerServo.write(steer+steerAdjust);
 	/* control loop frequency */
 	timeLoop = millis() - timeLoopStart;
 	if (timeLoop < POLL)
