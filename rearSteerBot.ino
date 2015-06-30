@@ -139,7 +139,10 @@ int getSteer() {
  * control loop
  */
 void loop() {
-	int steer;
+	/* control loop frequency */
+	unsigned long timeLoopStart;
+	unsigned long timeLoop;
+	timeLoopStart = millis();
 	/* perception */
 	unsigned long echoDuration;
 	digitalWrite(LEFTTRIGGER, HIGH);
@@ -169,9 +172,10 @@ void loop() {
 		delay(speedDelay);
 	}
 	/* decision */
+	int steer;
 	steer = getSteer();
 	/* communication */
-	Serial.println(String(cmLeft) + " | " + String(cmRight) + " -> " + String(steer));
+	Serial.println("[" + String(millis()) + "] " + String(cmLeft) + " | " + String(cmRight) + " -> " + String(steer));
 	/* action */
 	if (steer == STOP) {
 		digitalWrite(ENGINERELAY, LOW);
@@ -182,6 +186,8 @@ void loop() {
 		steerServo.write(steer+steerAdjust);
 	}
 	/* control loop frequency */
-	delay(POLL);
+	timeLoop = millis() - timeLoopStart;
+	if (timeLoop < POLL)
+		delay(POLL - timeLoop);
 }
 
