@@ -35,6 +35,8 @@
 #define STRAIGHT 90
 #define LEFT 140
 #define RIGHT 40
+/* STRAIGHT + STEERDELTA * MAXDELTARANGE = LEFT */
+#define STEERDELTA 5
 
 /* 
  * perception
@@ -44,13 +46,15 @@
 #define STOPRANGE 20
 #define ECHO_TIMEOUT 20000
 #define ECHO2CM(x) (x/60) 
+#define CMBUFSZ 20
+#define MAXDELTARANGE 10
+#define MINDELTARANGE 2
 
 /* 
  * internal state
  */
 #define DELTA_STEER 5
 #define DELTA_DELAY 2
-
 
 /* **** **** **** **** **** ****
  * Global variables
@@ -66,8 +70,15 @@ int speed;
 /* 
  * perception
  */
+/* immediate perception */
 int cmLeft;
 int cmRight;
+/* persistant perception */
+int cmLeftBuf[CMBUFSZ];
+int cmRightBuf[CMBUFSZ];
+int iCmBuf;
+int cmDeltaLeft;
+int cmDeltaRight;
 
 /* 
  * internal state
@@ -90,6 +101,15 @@ void setup() {
 	speedDelay = 0; 
 	steer = STRAIGHT;
 	speed = 0;
+	for (iCmBuf=0; iCmBuf<CMBUFSZ; iCmBuf++) {
+		cmLeftBuf[iCmBuf] = MAXRANGE;
+		cmRightBuf[iCmBuf] = MAXRANGE;
+	}
+	cmLeft = 0;
+	cmRight = 0;
+	iCmBuf = 0;
+	cmDeltaLeft = 0;
+	cmDeltaRight = 0;
 	/* gpio mappings */
 	pinMode(STEERSERVO, OUTPUT);
 	pinMode(INLEFT, INPUT);
@@ -122,12 +142,28 @@ void frontUltrasonicPerception() {
 	delayMicroseconds(10);
 	digitalWrite(LEFTTRIGGER, LOW);
 	echoDuration = pulseIn(INLEFTECHO, HIGH, ECHO_TIMEOUT);
-	cmLeft = echoDuration ? ECHO2CM(echoDuration) : MAXRANGE;
+	cmLeft = echoDuration ? ECHO2CM(echoDuration) : cmLeft;
 	digitalWrite(RIGHTTRIGGER, HIGH);
 	delayMicroseconds(10);
 	digitalWrite(RIGHTTRIGGER, LOW);
 	echoDuration = pulseIn(INRIGHTECHO, HIGH, ECHO_TIMEOUT);
-	cmRight = echoDuration ? ECHO2CM(echoDuration) : MAXRANGE;
+	cmRight = echoDuration ? ECHO2CM(echoDuration) : cmRight;
+}
+
+/*
+ * stores 1 second (20 * 50 ms) of ultra sonic sensors data
+ * to calculate the how fast the robots comes near obstacles.
+ * vars in: immediate perception
+ * vars out: persistent perception
+ */
+void frontUltrasonicPerceptionMemory() {
+	/* compute delta between oldest and latest mesure */
+	cmDeltaLeft = cmLeftBuf[iCmBuf] - cmLeft;
+	cmDeltaRight = cmRightBuf[iCmBuf] - cmRight;
+	/* store latest mesure */
+	cmLeftBuf[iCmBuf] = cmLeft;
+	cmRightBuf[iCmBuf] = cmRight;
+	iCmBuf = (iCmBuf + 1) % CMBUFSZ;
 }
 
 /* 
@@ -160,6 +196,15 @@ boolean avoidance() {
 boolean trajectory() {
 	steer = STRAIGHT;
 	speed = 1;
+	if (cmRight < cmLeft && cmDeltaRight > MINDELTARANGE)
+		steer = steer + min(cmDeltaRight,MAXDELTARANGE) * STEERDELTA;
+	if (cmLeft < cmRight && cmDeltaLeft > MINDELTARANGE)
+		steer = steer - min(cmDeltaLeft,MAXDELTARANGE) * STEERDELTA;
+	if (cmDeltaLeft > MAXDELTARANGE && cmDeltaRight > MAXDELTARANGE)
+		speed = 0;
+/*
+	Serial.println(String(cmDeltaLeft) +" | " + String(cmDeltaRight) + " -> " + String(steer) + " , " + String(speed));
+*/
 	return true;
 }
 
@@ -173,6 +218,7 @@ void loop() {
 	timeLoopStart = millis();
 	/* perception */
 	frontUltrasonicPerception();
+	frontUltrasonicPerceptionMemory();
 	/* inner state calibration */
 	if (digitalRead(INLEFT) == HIGH)
 		steerAdjust += DELTA_STEER;
@@ -188,8 +234,9 @@ void loop() {
 	/* decision */
 	if (!avoidance())
 		trajectory();
-	/* communication */
+/*
 	Serial.println("[" + String(millis()) + "] " + String(cmLeft) + " | " + String(cmRight) + " -> " + String(steer) + " , " + String(speed));
+*/
 	/* action */
 	digitalWrite(ENGINERELAY, speed ? HIGH : LOW);
 	steerServo.write(steer+steerAdjust);
