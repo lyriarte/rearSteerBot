@@ -42,6 +42,8 @@
 #define MAXRANGE 200
 #define MINRANGE  50
 #define STOPRANGE 20
+#define ECHO_TIMEOUT 20000
+#define ECHO2CM(x) (x/60) 
 
 /* 
  * internal state
@@ -108,6 +110,26 @@ void setup() {
 	digitalWrite(RIGHTTRIGGER, LOW);
 }
 
+/*
+ * ultra sonic sensors perception function
+ * 	gpio in:	INLEFTECHO, INRIGHTECHO
+ * 	gpio out:	LEFTTRIGGER, RIGHTTRIGGER
+ * 	perception vars out: cmLeft, cmRight
+ */
+void frontUltrasonicPerception() {
+	unsigned long echoDuration;
+	digitalWrite(LEFTTRIGGER, HIGH);
+	delayMicroseconds(10);
+	digitalWrite(LEFTTRIGGER, LOW);
+	echoDuration = pulseIn(INLEFTECHO, HIGH, ECHO_TIMEOUT);
+	cmLeft = echoDuration ? ECHO2CM(echoDuration) : MAXRANGE;
+	digitalWrite(RIGHTTRIGGER, HIGH);
+	delayMicroseconds(10);
+	digitalWrite(RIGHTTRIGGER, LOW);
+	echoDuration = pulseIn(INRIGHTECHO, HIGH, ECHO_TIMEOUT);
+	cmRight = echoDuration ? ECHO2CM(echoDuration) : MAXRANGE;
+}
+
 /* 
  * reactive avoidance decision function
  */
@@ -150,17 +172,7 @@ void loop() {
 	unsigned long timeLoop;
 	timeLoopStart = millis();
 	/* perception */
-	unsigned long echoDuration;
-	digitalWrite(LEFTTRIGGER, HIGH);
-	delayMicroseconds(10);
-	digitalWrite(LEFTTRIGGER, LOW);
-	echoDuration = pulseIn(INLEFTECHO, HIGH, 100000);
-	cmLeft = echoDuration ? echoDuration / 60 : MAXRANGE;
-	digitalWrite(RIGHTTRIGGER, HIGH);
-	delayMicroseconds(10);
-	digitalWrite(RIGHTTRIGGER, LOW);
-	echoDuration = pulseIn(INRIGHTECHO, HIGH, 100000);
-	cmRight = echoDuration ? echoDuration / 60 : MAXRANGE;
+	frontUltrasonicPerception();
 	/* inner state calibration */
 	if (digitalRead(INLEFT) == HIGH)
 		steerAdjust += DELTA_STEER;
