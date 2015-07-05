@@ -15,6 +15,14 @@
  * Constants
  * **** **** **** **** **** ****/
 
+#ifdef LOG_DEBUG
+char * decisionLevelName[] = {
+	"AVOIDANCE",
+	"TRAJECTORY",
+	"FREE RUN"
+};
+#endif
+
 /* 
  * gpio mappings
  */
@@ -42,6 +50,8 @@
 #define RIGHT 40
 /* STRAIGHT + STEERDELTA * MAXDELTARANGE = LEFT */
 #define STEERDELTA 1
+/* STRAIGHT + STEERRANGE = LEFT / STRAIGHT - STEERRANGE = RIGHT */
+#define STEERRANGE 50
 
 /* 
  * perception
@@ -85,13 +95,16 @@ int cmRightBuf[CMBUFSZ];
 int iCmBuf;
 int cmDeltaLeft;
 int cmDeltaRight;
+int cmAvgLeft;
+int cmAvgRight;
 
 /* 
  * internal state
  */
 int steerAdjust;
 int speedDelay;
-
+/* decision level */ 
+int decisionLevel;
 
 
 /* **** **** **** **** **** ****
@@ -108,14 +121,16 @@ void setup() {
 	steer = STRAIGHT;
 	speed = 0;
 	for (iCmBuf=0; iCmBuf<CMBUFSZ; iCmBuf++) {
-		cmLeftBuf[iCmBuf] = MAXRANGE;
-		cmRightBuf[iCmBuf] = MAXRANGE;
+		cmLeftBuf[iCmBuf] = 0;
+		cmRightBuf[iCmBuf] = 0;
 	}
 	cmLeft = 0;
 	cmRight = 0;
 	iCmBuf = 0;
 	cmDeltaLeft = 0;
 	cmDeltaRight = 0;
+	cmAvgLeft = 0;
+	cmAvgRight = 0;
 	/* gpio mappings */
 	pinMode(STEERSERVO, OUTPUT);
 	pinMode(INLEFT, INPUT);
@@ -168,6 +183,9 @@ void frontUltrasonicPerception() {
 void frontUltrasonicPerceptionMemory() {
 	int prevIndex = iCmBuf > 0 ? (iCmBuf - 1) % CMBUFSZ : CMBUFSZ - 1;
 	int nextIndex = (iCmBuf + 1) % CMBUFSZ;
+	/*  add latest mesure to / substract oldest mesure from average */
+	cmAvgLeft = cmAvgLeft + (cmLeft - cmLeftBuf[iCmBuf]) / CMBUFSZ;
+	cmAvgRight = cmAvgRight + (cmRight - cmRightBuf[iCmBuf]) / CMBUFSZ;
 	/* substract delta between oldest and second oldest mesure */
 	cmDeltaLeft -= (cmLeftBuf[iCmBuf] - cmLeftBuf[nextIndex]);
 	cmDeltaRight -= (cmRightBuf[iCmBuf] - cmRightBuf[nextIndex]);
@@ -210,13 +228,22 @@ boolean avoidance() {
 boolean trajectory() {
 	steer = STRAIGHT;
 	speed = 1;
+	/* straight ahead */
 	if (cmRight >= MAXRANGE && cmLeft >= MAXRANGE)
 		return false;
+	/* steer away from the closest fast approaching obstacle */
 	if (cmRight < cmLeft && cmDeltaRight > MINDELTARANGE)
 		steer = steer + min(cmDeltaRight,MAXDELTARANGE) * STEERDELTA;
 	if (cmLeft < cmRight && cmDeltaLeft > MINDELTARANGE)
 		steer = steer - min(cmDeltaLeft,MAXDELTARANGE) * STEERDELTA;
-	if (cmDeltaLeft > MAXDELTARANGE && cmDeltaRight > MAXDELTARANGE)
+	/* if going straight, steer slightly to the most open area */
+	if (steer == STRAIGHT && cmLeft >= MAXRANGE && cmAvgLeft >= MAXRANGE)
+		steer = steer + STEERRANGE / 4;
+	if (steer == STRAIGHT && cmRight >= MAXRANGE && cmAvgRight >= MAXRANGE)
+		steer = steer - STEERRANGE / 4;
+	/* stop temporarily if approaching too fast on both sides */
+	if (cmDeltaLeft > MAXDELTARANGE && cmDeltaRight > MAXDELTARANGE
+		&& cmAvgLeft < MAXRANGE / 2 && cmAvgRight < MAXRANGE / 2)
 		speed = 0;
 	return true;
 }
@@ -248,18 +275,21 @@ void loop() {
 		digitalWrite(ENGINERELAY, LOW);
 		delay(speedDelay);
 	}
-	/* log message construction */
-#if LOG_DEBUG
-	logMsg = "[" + String(timeLoopStart) + "] " + String(cmLeft) + " | " + String(cmRight);
-#endif
 	/* decision */
+	decisionLevel = 0;
 	if (!avoidance()) {
-#if LOG_DEBUG
-		logMsg += " <"  + String(cmDeltaLeft) + " | " + String(cmDeltaRight) + "> ";
-#endif
-		trajectory();
+		++decisionLevel;
+		if (!trajectory()) {
+			++decisionLevel;
+		}
 	}
 #if LOG_DEBUG
+	/* log message construction */
+	logMsg = decisionLevelName[decisionLevel];
+	logMsg += "\t[" + String(timeLoopStart) + "] ";
+	logMsg += String(cmLeft) + "," + String(cmAvgLeft) + "," + String(cmDeltaLeft);
+	logMsg += " | ";
+	logMsg += String(cmRight) + "," + String(cmAvgRight) + "," + String(cmDeltaRight);
 	logMsg += "\t -> " + String(steer) + " , " + String(speed);
 	/* print log message */
 	Serial.println(logMsg);
