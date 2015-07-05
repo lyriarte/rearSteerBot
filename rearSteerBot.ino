@@ -7,6 +7,11 @@
 
 
 /* **** **** **** **** **** ****
+ * Build directives
+ * **** **** **** **** **** ****/
+#define LOG_DEBUG 0
+
+/* **** **** **** **** **** ****
  * Constants
  * **** **** **** **** **** ****/
 
@@ -122,7 +127,9 @@ void setup() {
 	pinMode(RIGHTTRIGGER, OUTPUT);
 	/* subsystems setup */
 	steerServo.attach(STEERSERVO);
+#if LOG_DEBUG
 	Serial.begin(9600);
+#endif
 	/* initial action state */
 	steerServo.write(steer);
 	digitalWrite(ENGINERELAY, LOW);
@@ -204,9 +211,6 @@ boolean trajectory() {
 		steer = steer - min(cmDeltaLeft,MAXDELTARANGE) * STEERDELTA;
 	if (cmDeltaLeft > MAXDELTARANGE && cmDeltaRight > MAXDELTARANGE)
 		speed = 0;
-/*
-	Serial.println(String(cmDeltaLeft) +" | " + String(cmDeltaRight) + " -> " + String(steer) + " , " + String(speed));
-*/
 	return true;
 }
 
@@ -214,6 +218,10 @@ boolean trajectory() {
  * control loop
  */
 void loop() {
+	/* log message */
+#if LOG_DEBUG
+	String logMsg;
+#endif
 	/* control loop frequency */
 	unsigned long timeLoopStart;
 	unsigned long timeLoop;
@@ -233,12 +241,22 @@ void loop() {
 		digitalWrite(ENGINERELAY, LOW);
 		delay(speedDelay);
 	}
+	/* log message construction */
+#if LOG_DEBUG
+	logMsg = "[" + String(timeLoopStart) + "] " + String(cmLeft) + " | " + String(cmRight);
+#endif
 	/* decision */
-	if (!avoidance())
+	if (!avoidance()) {
+#if LOG_DEBUG
+		logMsg += " <"  + String(cmDeltaLeft) + " | " + String(cmDeltaRight) + "> ";
+#endif
 		trajectory();
-/*
-	Serial.println("[" + String(millis()) + "] " + String(cmLeft) + " | " + String(cmRight) + " -> " + String(steer) + " , " + String(speed));
-*/
+	}
+#if LOG_DEBUG
+	logMsg += "\t -> " + String(steer) + " , " + String(speed);
+	/* print log message */
+	Serial.println(logMsg);
+#endif
 	/* action */
 	digitalWrite(ENGINERELAY, speed ? HIGH : LOW);
 	steerServo.write(steer+steerAdjust);
