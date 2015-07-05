@@ -54,6 +54,7 @@
 #define CMBUFSZ 20
 #define MAXDELTARANGE 50
 #define MINDELTARANGE 2
+#define MISSED_PERCEPTION_INCREMENT 5
 
 /* 
  * internal state
@@ -149,12 +150,12 @@ void frontUltrasonicPerception() {
 	delayMicroseconds(10);
 	digitalWrite(LEFTTRIGGER, LOW);
 	echoDuration = pulseIn(INLEFTECHO, HIGH, ECHO_TIMEOUT);
-	cmLeft = echoDuration ? ECHO2CM(echoDuration) : cmLeft;
+	cmLeft = echoDuration ? ECHO2CM(echoDuration) : min(cmLeft + MISSED_PERCEPTION_INCREMENT,MAXRANGE);
 	digitalWrite(RIGHTTRIGGER, HIGH);
 	delayMicroseconds(10);
 	digitalWrite(RIGHTTRIGGER, LOW);
 	echoDuration = pulseIn(INRIGHTECHO, HIGH, ECHO_TIMEOUT);
-	cmRight = echoDuration ? ECHO2CM(echoDuration) : cmRight;
+	cmRight = echoDuration ? ECHO2CM(echoDuration) : min(cmRight + MISSED_PERCEPTION_INCREMENT,MAXRANGE);
 }
 
 /*
@@ -209,7 +210,7 @@ boolean avoidance() {
 boolean trajectory() {
 	steer = STRAIGHT;
 	speed = 1;
-	if (cmRight > MAXRANGE && cmLeft > MAXRANGE)
+	if (cmRight >= MAXRANGE && cmLeft >= MAXRANGE)
 		return false;
 	if (cmRight < cmLeft && cmDeltaRight > MINDELTARANGE)
 		steer = steer + min(cmDeltaRight,MAXDELTARANGE) * STEERDELTA;
