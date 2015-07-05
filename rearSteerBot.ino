@@ -160,17 +160,23 @@ void frontUltrasonicPerception() {
 /*
  * stores 1 second (20 * 50 ms) of ultra sonic sensors data
  * to calculate the how fast the robots comes near obstacles.
+ * sums buffer deltas for a smooth perception of the last second.
  * vars in: immediate perception
  * vars out: persistent perception
  */
 void frontUltrasonicPerceptionMemory() {
-	/* compute delta between oldest and latest mesure */
-	cmDeltaLeft = cmLeftBuf[iCmBuf] - cmLeft;
-	cmDeltaRight = cmRightBuf[iCmBuf] - cmRight;
+	int prevIndex = iCmBuf > 0 ? (iCmBuf - 1) % CMBUFSZ : CMBUFSZ - 1;
+	int nextIndex = (iCmBuf + 1) % CMBUFSZ;
+	/* substract delta between oldest and second oldest mesure */
+	cmDeltaLeft -= (cmLeftBuf[iCmBuf] - cmLeftBuf[nextIndex]);
+	cmDeltaRight -= (cmRightBuf[iCmBuf] - cmRightBuf[nextIndex]);
+	/* add delta between last saved and latest mesure */
+	cmDeltaLeft += cmLeftBuf[prevIndex] - cmLeft;
+	cmDeltaRight += cmRightBuf[prevIndex] - cmRight;
 	/* store latest mesure */
 	cmLeftBuf[iCmBuf] = cmLeft;
 	cmRightBuf[iCmBuf] = cmRight;
-	iCmBuf = (iCmBuf + 1) % CMBUFSZ;
+	iCmBuf = nextIndex;
 }
 
 /* 
